@@ -15,19 +15,22 @@ use serde::Deserialize;
 
 const DB_STRING: &str = "sqlite:messages.db";
 
-#[derive(Deserialize)]
+/// Struct representing the webhook sent by Twilio when a message is received
 #[allow(non_snake_case)]
+#[derive(Deserialize)]
 struct TwilioWebhook {
-    From: String,
-    Body: String,
+    From: String, // phone number, starts with +country_code ie +10123456789
+    Body: String, // message body
 }
 
+/// Trait representing a messaging client that can send and receive messages
 #[async_trait]
 trait MessagingClient: Send + Sync {
     async fn send_message(&self, phone_number: &str, message: &str);
     async fn receive_message(&self, phone_number: &str, message: &str);
 }
 
+/// Struct for a client using Twilio's API for SMS
 struct TwilioSMSClient {
     account_sid: String,
     auth_token: String,
@@ -55,6 +58,7 @@ impl TwilioSMSClient {
 
 #[async_trait]
 impl MessagingClient for TwilioSMSClient {
+    /// Send an SMS message to a phone number
     async fn send_message(&self, phone_number: &str, message: &str) {
         println!("Sending SMS to: {}", phone_number);
         println!("Message: {}", message);
@@ -78,7 +82,8 @@ impl MessagingClient for TwilioSMSClient {
             .await
             .expect("Failed to send message");
     }
-
+    
+    /// Receive an SMS message from a phone number
     async fn receive_message(&self, phone_number: &str, message: &str) {
         println!("Received SMS from: {}", phone_number);
         println!("Message: {}", message);
@@ -92,6 +97,7 @@ impl MessagingClient for TwilioSMSClient {
     }
 }
 
+/// Handle an incoming SMS message from local API endpoint
 async fn handle_sms(
     State(messaging_client): State<Arc<dyn MessagingClient>>,
     Form(webhook): Form<TwilioWebhook>,
@@ -103,11 +109,10 @@ async fn handle_sms(
 
 #[tokio::main]
 async fn main() {
-    dotenv::dotenv().ok(); // load .env file if it exists
+    dotenv::dotenv().ok(); // load .env file
 
-    let chatbot = ChatBot::new(DB_STRING.to_string()).await;
     let messaging_client = Arc::new(TwilioSMSClient::new(
-        Arc::new(chatbot),
+        Arc::new(ChatBot::new(DB_STRING.to_string()).await),
         std::env::var("TWILIO_ACCOUNT_SID").unwrap(),
         std::env::var("TWILIO_AUTH_TOKEN").unwrap(),
         std::env::var("TWILIO_PHONE_NUMBER").unwrap(),

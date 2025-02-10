@@ -1,4 +1,3 @@
-// Purpose: Chatbot implementation using OpenAI's GPT-4 model.
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
@@ -10,12 +9,14 @@ use futures::stream::StreamExt;
 
 const DAILY_MESSAGE_LIMIT: i32 = 10;
 
+/// Struct representing a message for the GPT API
 #[derive(Deserialize, Debug, Serialize)]
 struct GPTMessage {
     role: String, // valid values: "User", "System"
     content: String,
 }
 
+/// Struct representing a user in the db
 #[derive(Debug)]
 struct User {
     phone_number: String,
@@ -37,14 +38,11 @@ impl ChatBot {
         }
     }
 
+    /// Handle an incoming message from a phone number
     pub async fn handle_message(&self, from: String, message: String) -> String {
-        println!("Received SMS from: {}", from);
-        println!("Message: {}", message);
-
         let mut user = self.find_user(&from).await.unwrap();
 
         if let Some(short_circuit) = Self::handle_short_circuits(&mut user, &message) {
-            println!("Short circuiting: {}", short_circuit);
             self.update_db(&user).await;
             user.total_sent += 1;
             return short_circuit;
@@ -71,6 +69,9 @@ impl ChatBot {
         returned_message
     }
 
+    /// Handle special commands without going through GPT
+    ///
+    /// Returns a response if the message is a special command, otherwise None
     fn handle_short_circuits(user: &mut User, msg: &str) -> Option<String> {
         // first reset the daily quota if needed
         if Utc::now() >= user.last_reset + Duration::days(1) {
@@ -125,6 +126,7 @@ impl ChatBot {
         db_pool
     }
 
+    /// Convert a slice of GPT messages to a vec of ChatCompletionMessages
     fn make_chat_completion_message(messages: &[GPTMessage]) -> Vec<ChatCompletionMessage> {
         messages
             .iter()
@@ -143,6 +145,7 @@ impl ChatBot {
             .collect()
     }
 
+    /// Get a response from the GPT API
     async fn get_gpt_response(messages: Vec<ChatCompletionMessage>) -> String {
         let credentials = openai::Credentials::from_env();
         let chat_completion = ChatCompletion::builder("gpt-4o", messages)
@@ -165,6 +168,7 @@ impl ChatBot {
         }
     }
 
+    /// Find a user in the database
     async fn find_user(&self, phone_number: &str) -> Option<User> {
         let mut user = User {
             phone_number: phone_number.to_string(),
@@ -199,6 +203,7 @@ impl ChatBot {
         Some(user)
     }
 
+    /// Update a user in the database
     async fn update_db(&self, user: &User) {
         sqlx::query(
             r#"
