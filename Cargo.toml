@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+async-trait = "0.1.86"
 axum = "0.8.1"
 chrono = "0.4.39"
+dotenv = "0.15.0"
 futures = "0.3.31"
 log = "0.4.25"
 openai = "1.0.0-alpha.19"
