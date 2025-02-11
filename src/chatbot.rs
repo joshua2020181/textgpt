@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Duration, Utc};
 use openai::chat::{ChatCompletion, ChatCompletionMessage, ChatCompletionMessageRole};
 use serde::{Deserialize, Serialize};
-use sqlx::{sqlite::SqlitePool, Row};
+use sqlx::{migrate::MigrateDatabase, sqlite::SqlitePool, Row, Sqlite};
 
 use futures::stream::StreamExt;
 
@@ -53,10 +53,8 @@ impl ChatBot {
             content: message.clone(),
         });
 
-        let messages = Self::make_chat_completion_message(&user.messages);
-        println!("messages: {:?}", messages);
-
-        let returned_message = Self::get_gpt_response(messages).await;
+        let returned_message =
+            Self::get_gpt_response(Self::make_chat_completion_message(&user.messages)).await;
 
         user.messages.push(GPTMessage {
             role: "System".to_string(),
@@ -104,6 +102,14 @@ impl ChatBot {
     /// Initialize the database with the necessary table
     async fn init_db(connection_string: &str) -> SqlitePool {
         // create the database if it doesn't exist
+        if !Sqlite::database_exists(connection_string)
+            .await
+            .expect("Failed to check if database exists")
+        {
+            Sqlite::create_database(connection_string)
+                .await
+                .expect("Failed to create database");
+        }
         let db_pool = SqlitePool::connect(connection_string)
             .await
             .expect("Failed to connect to database");
